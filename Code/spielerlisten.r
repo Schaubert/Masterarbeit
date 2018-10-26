@@ -1,5 +1,8 @@
 ##### Scraping für Spielerlisten #####
 
+## source global.r
+source("./Code/global.r")
+
 #### > Durchlaufe Webpages für Spielerlisten ####
 
 ## Stamm-URL
@@ -137,3 +140,12 @@ for(i in seq_along(saisons)){
   saveRDS(spielerliste, file = paste0("./Data/Spielerlisten/spielerliste", saisons[i], ".rds"))
   
 }
+
+
+##### Wichtige Notizen #####
+# Es kann vorkommen, dass bei Spielern die Größe nicht bekannt ist. Diese ist
+# dann mit "???" angegeben. Beim Umwandeln in numerics entstehen dadurch
+# natürlich NAs. (Bsp. Jonathan Meier -> ??? in der Saison 2017/2018).
+# Spieler, die den Verein gewechselt haben, findet man unter dem Verein, unter
+# dem sie in die Saison gestartet sind. (Bsp. Terrode -> Köln in der Saison
+# 2017/2018).
