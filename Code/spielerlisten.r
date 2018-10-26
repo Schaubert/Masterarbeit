@@ -141,6 +141,27 @@ for(i in seq_along(saisons)){
   
 }
 
+#### > Erstelle einen kompletten Spielerdatensatz ####
+
+gesamtliste <- data.table()
+
+for(i in seq_along(saisons)){
+  
+  gesamtliste <- rbind(gesamtliste,
+                       readRDS(paste0("./Data/Spielerlisten/spielerliste", saisons[i], ".rds")) %>% 
+                         .[, saison := paste0(saisons[i], "/", saisons[i]+1)],
+                       use.names = TRUE)
+  
+}
+
+saveRDS(gesamtliste, file = "./Data/Spielerlisten/gesamtliste.rds")
+
+## Interessanter Fakt:
+
+table(gesamtliste[, names]) %>% sort(decreasing = TRUE)
+# 39 Spieler haben in allen Saisons in der Bundesliga gespielt
+# VORSICHT: Wenn 2 Spieler dengleichen Namen haben, werden sie mehrfach gezählt
+
 
 ##### Wichtige Notizen #####
 # Es kann vorkommen, dass bei Spielern die Größe nicht bekannt ist. Diese ist
