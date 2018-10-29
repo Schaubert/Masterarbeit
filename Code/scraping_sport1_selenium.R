@@ -151,3 +151,5 @@ gesamtliste %>%
 
 scraped_data <- scraper(urls = gesamtliste[1:50, url], saisons = gesamtliste[1:50, saison_for_url])
 saveRDS(scraped_data, file = "./Data/erste_leistungsdaten.rds")
+
+scraped_data2 <- scraper(urls = gesamtliste[51:150, url], saisons = gesamtliste[51:150, saison_for_url])
