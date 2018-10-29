@@ -81,7 +81,7 @@ scraper <- function(urls = "none", saisons = 2018){
   for(i in seq_along(urls)){
     
     ## open Server
-    rD <- rsDriver(port = 2365L, browser = "chrome")
+    rD <- rsDriver(port = as.integer(i), browser = "chrome")
     
     remDr <- rD[["client"]]
     remDr$navigate(urls[i])
@@ -130,5 +130,24 @@ scraper <- function(urls = "none", saisons = 2018){
 data_test <- scraper(urls = c("https://www.sport1.de/person/thomas-muller", "https://www.sport1.de/person/manuel-neuer"), saisons = c(2018, 2018))
 # Klappt
 
-##### Render URLs #####
-gesamtliste <- readRDS("./Data/Spielerlisten/gesamtliste.rds")
+##### > Render URLs #####
+## Lade Spielerliste
+gesamtliste <- readRDS("./Data/Spielerlisten/gesamtliste.rds") %>% 
+  setDT
+
+## Bringe Namen auf URL Form und extrahiere Saison für Scrape-Funktion
+gesamtliste %>% 
+  .[, name_for_url := str_replace_all(names, " ", "-")] %>% 
+  .[, saison_for_url := vapply(saison, function(X){str_split(X, "/") %>% unlist %>% .[1]}, FUN.VALUE = "numeric") %>% as.numeric] %>% 
+  .[, name_for_url := str_replace_all(name_for_url, "Ð", "d") %>% 
+      str_replace_all("Ž", "z") %>% 
+      str_replace_all("ë", "e") %>% 
+      str_replace_all("Ç", "c") %>% 
+      str_replace_all("ð", "d") %>% 
+      ifelse(substr(., 1, 1) == "-", substr(., 2, 100), .)] %>% 
+  .[, url := paste0("https://www.sport1.de/person/", name_for_url)]
+
+#### > Funktionstest mit gerenderten URLs ####
+
+scraped_data <- scraper(urls = gesamtliste[1:50, url], saisons = gesamtliste[1:50, saison_for_url])
+saveRDS(scraped_data, file = "./Data/erste_leistungsdaten.rds")
