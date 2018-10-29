@@ -23,7 +23,7 @@ source("./Code/global.r")
 page_url <- "https://www.sport1.de/person/"
 
 ## Die Spieler (erstmal ein Teil)
-spielernummern <- seq(1, 100000)
+spielernummern <- seq(1, 10000)
 # Bei allen Spielernummern wird der Vektor über 50 Mb groß
 
 ## Zusammengesetzte URLs
@@ -51,58 +51,80 @@ data_cleaned <- data_processed %>%
   .[c(2,5)]
 
 #### >> Schreibe Funktion für alle Spieler
-scrape_for_url <- function(number_start = 1, number_end = 100, check_steps = 0){
+scrape_for_url <- function(numbers = seq(1,100), check_steps = 0){
   
-  stopifnot(number_start <= number_end)
+  urls <- vapply(numbers, 
+                 function(X){paste0(page_url, X)}, 
+                 FUN.VALUE = "character")
   
-  dt <- data.table()
+  data_cleaned <- vapply(urls, function(X){st <- xml2::read_html(X) 
+  datavec <- ifelse(test = class(st) != "try-error", 
+         yes = html_nodes(st, ".s1-column-double") %>% 
+           html_text %>% 
+           str_replace_all("Name", ",") %>%
+           str_replace_all("Nation", ",") %>%
+           str_replace_all("Geboren am", ",") %>%
+           str_replace_all("Berlin", "B") %>%
+           str_replace_all("in\n", ",") %>%
+           str_split(",") %>%
+           unlist %>% 
+           .[c(2,5)],
+         no = c(NA, NA))
+  array(data = datavec)}, 
+  FUN.VALUE = c(names = "character", birthday = "character"))
   
-  for(number in number_start:number_end){
-    page_url <- paste0("https://www.sport1.de/person/", number)
-    
-    ## Scrape Data von URL
-    webdata <- try(xml2::read_html(page_url))
-    
-    if(class(webdata) != "try-error"){
-    ## Verarbeite Data von URL
-    data_processed <- html_nodes(webdata, ".s1-column-double") %>% 
-      html_text
-    
-    ## Säubere Daten
-    data_cleaned <- data_processed %>% 
-      str_replace_all("Name", ",") %>% 
-      str_replace_all("Nation", ",") %>% 
-      str_replace_all("Geboren am", ",") %>% 
-      str_replace_all("in\n", ",") %>% 
-      str_split(",") %>% 
-      unlist %>% 
-      .[c(2,5)]
-    
-    ## Merge Data.Table
-    
-    dt <- rbind(dt,
-                data.table(name = data_cleaned[1],
-                           birthday = data_cleaned[2],
-                           id = number),
-                use.names = TRUE)
-    }else{
-      dt <- rbind(dt,
-                  data.table(name = NA,
-                             birthday = NA,
-                             id = number),
-                  use.names = TRUE)
-    }
-    if(check_steps != 0 && number %% check_steps == 0){
-      print(number)
-    }
-    
-  }
+  dt <- data.table(names = data_cleaned[1,],
+                   birthday = data_cleaned[2,],
+                   id = numbers)
+  
+  # for(number in numbers){
+  #   page_url <- paste0("https://www.sport1.de/person/", number)
+  # 
+  #   ## Scrape Data von URL
+  #   webdata <- try(xml2::read_html(page_url))
+  # 
+  #   if(class(webdata) != "try-error"){
+  #   ## Verarbeite Data von URL
+  #   data_processed <- html_nodes(webdata, ".s1-column-double") %>%
+  #     html_text
+  # 
+  #   ## Säubere Daten
+  #   data_cleaned <- data_processed %>%
+  #     str_replace_all("Name", ",") %>%
+  #     str_replace_all("Nation", ",") %>%
+  #     str_replace_all("Geboren am", ",") %>%
+  #     str_replace_all("in\n", ",") %>%
+  #     str_split(",") %>%
+  #     unlist %>%
+  #     .[c(2,5)]
+  #   
+  #   ## Merge Data.Table
+  #   
+  #   dt <- rbind(dt,
+  #               data.table(name = data_cleaned[1],
+  #                          birthday = data_cleaned[2],
+  #                          id = number),
+  #               use.names = TRUE)
+  #   }else{
+  #     dt <- rbind(dt,
+  #                 data.table(name = NA,
+  #                            birthday = NA,
+  #                            id = number),
+  #                 use.names = TRUE)
+  #   }
+  # 
+  #   if(check_steps != 0 && number %% check_steps == 0){
+  #     print(number)
+  #   }
+  #   
+  # }
   
   dt
 }
 
 #### >> Testen der Funktion
-erste_nummern <- scrape_for_url(number_start = 1, number_end = 100, check_steps = 25)
+# erste_nummern <- scrape_for_url(number_start = 1, number_end = 100, check_steps = 25)
+testing <- scrape_for_url(numbers=seq(1,250))
 
 # Kurz Abspeichern, wegen Zeitgründen; es gab Probleme beim Geburtstag: Doppelchecken!
 saveRDS(erste_nummern, file = "./Data/erste_nummern_sport1.rds")
