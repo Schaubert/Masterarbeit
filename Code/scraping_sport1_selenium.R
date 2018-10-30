@@ -71,17 +71,17 @@ rm("option", "rD", "remDr")
 
 #### > Funktion zum Scrapen ####
 
-scraper <- function(urls = "none", saisons = 2018){
+scraper <- function(urls = "none", saisons = 2018, file = "./Data/daten.rds"){
+  
+  dt <- readRDS(file) %>% 
+    setDT
   
   length_all <- length(urls)
-  
-  steckbrief <- vector(length = length(urls), mode = "character")
-  performance_data <- vector(length = length(urls), mode = "character")
   
   for(i in seq_along(urls)){
     
     ## open Server
-    rD <- rsDriver(port = as.integer(i), browser = "chrome")
+    rD <- rsDriver(port = floor(runif(1,1,9999)) %>% as.integer, browser = "firefox")
     
     remDr <- rD[["client"]]
     remDr$navigate(urls[i])
@@ -97,7 +97,7 @@ scraper <- function(urls = "none", saisons = 2018){
       
       ## Get Steckbrief
       option <- remDr$findElement(using = 'css selector', ".s1-column-double")
-      steckbrief[i] <- option$getElementText() %>% unlist
+      steckbrief <- option$getElementText() %>% unlist
       
       ## Klicke auf Saisonbox
       option <- remDr$findElement(using = "css selector", ".s1-person-performance-data .s1-popup-button-title")
@@ -112,25 +112,31 @@ scraper <- function(urls = "none", saisons = 2018){
       
       ## Scrape data from box
       option <- remDr$findElement(using = "css selector", ".s1-person-performance-data")
-      performance_data[i] <- option$getElementText() %>% unlist
+      performance_data <- option$getElementText() %>% unlist
       
     }else{
-      steckbrief[i] <- NA
-      performance_data[i] <- NA
+      steckbrief <- NA
+      performance_data <- NA
     }
     
+    dt <- rbind(dt,
+                data.table(steckbrief = steckbrief, 
+                           urls = urls[i], 
+                           performance_data = performance_data, 
+                           saisons = saisons[i]))
+    saveRDS(dt, file = file)
     remDr$close()
-    rm("option", "rD", "remDr")
+    rm("option", "rD", "remDr", "steckbrief", "performance_data")
   }
   
-  data.table(steckbrief = steckbrief, urls = urls, performance_data = performance_data, saisons = saisons)
+  dt
 }
 
 #### >> Funktions Test ####
 data_test <- scraper(urls = c("https://www.sport1.de/person/thomas-muller", "https://www.sport1.de/person/manuel-neuer"), saisons = c(2018, 2018))
 # Klappt
 
-##### > Render URLs #####
+##### >> Render URLs #####
 ## Lade Spielerliste
 gesamtliste <- readRDS("./Data/Spielerlisten/gesamtliste.rds") %>% 
   setDT
@@ -145,11 +151,99 @@ gesamtliste %>%
       str_replace_all("Ç", "c") %>% 
       str_replace_all("ð", "d") %>% 
       ifelse(substr(., 1, 1) == "-", substr(., 2, 100), .)] %>% 
-  .[, url := paste0("https://www.sport1.de/person/", name_for_url)]
+  .[, url := paste0("https://www.sport1.de/person/", name_for_url)] %>% 
+  .[, anzahl := .N, by = names]
 
-#### > Funktionstest mit gerenderten URLs ####
+subset_list <- gesamtliste %>% 
+  .[order(names)] %>% 
+  .[anzahl > 2]
 
-scraped_data <- scraper(urls = gesamtliste[1:50, url], saisons = gesamtliste[1:50, saison_for_url])
+name_list <- subset_list[, names] %>% unique
+
+#### >> Funktionstest mit gerenderten URLs ####
+
+#scraped_data <- scraper(urls = gesamtliste[1:50, url], saisons = gesamtliste[1:50, saison_for_url])
 saveRDS(scraped_data, file = "./Data/erste_leistungsdaten.rds")
 
-scraped_data2 <- scraper(urls = gesamtliste[51:150, url], saisons = gesamtliste[51:150, saison_for_url])
+scraped_data2 <- scraper(urls = gesamtliste[91:150, url], saisons = gesamtliste[91:150, saison_for_url], file = "./Data/zweite_leistungsdaten.rds")
+
+#### > Upgedatete Funktion ####
+
+scraper2 <- function(.data = dt(), .names = "none", file = "./Data/daten.rds"){
+  
+  dt <- readRDS("./Data/scrape2_test.rds") %>% 
+    setDT
+  
+  for(i in seq_along(.names)){
+    
+    ## Get Saisons
+    n <- nrow(.data[names == .names[i]])
+    
+    ## open Server
+    rD <- rsDriver(port = floor(runif(1,1,9999)) %>% as.integer, browser = "firefox")
+    
+    remDr <- rD[["client"]]
+    remDr$navigate(.data[names == .names[i], url %>% head(1)])
+    
+    # Sys.sleep(3)
+    
+    ## Check, ob Spieler existent
+    option <- try(remDr$findElement(using = "css selector", ".s1-dashboard-headline"))
+    
+    Sys.sleep(1)
+    
+    if(class(option) != "try-error"){
+      
+      ## Get Steckbrief
+      option <- remDr$findElement(using = 'css selector', ".s1-column-double")
+      steckbrief <- option$getElementText() %>% unlist
+      
+      ## Initialisiere Leistungsdatenvektor
+      ldv <- vector(length = n, mode = "character")
+      
+      ## Ermittle Saisons
+      saisons <- .data[names == .names[i], saison_for_url]
+      
+      for(j in 1:n){
+        ## Klicke auf Saisonbox
+        option <- remDr$findElement(using = "css selector", ".s1-person-performance-data .s1-popup-button-title")
+        option$clickElement()
+        
+        ## Offene Box -> Saison auswählen
+        option <- remDr$findElement(using = "css selector", paste0(".s1-person-performance-data .s1-popup-button-menu li:nth-child(", 
+                                                                   2018-saisons[j] + 1, 
+                                                                   ") a"))
+        option$clickElement()
+        
+        Sys.sleep(3)
+        
+        ## Scrape data from box
+        option <- remDr$findElement(using = "css selector", ".s1-person-performance-data")
+        ldv[j] <- option$getElementText() %>% unlist
+        
+        Sys.sleep(1)
+      }
+      
+    }else{
+      steckbrief <- NA
+      ldv <- NA
+      saisons <- NA
+    }
+    
+    dt <- rbind(dt,
+                data.table(name = .names[i],
+                           steckbrief = steckbrief,
+                           performance_data = list(ldv), 
+                           saisons = list(saisons)))
+    
+    remDr$close()
+    rm("option", "rD", "remDr", "steckbrief", "ldv", "saisons")
+    saveRDS(dt, file = file)
+    print(i)
+  }
+  
+  dt
+}
+
+#### >> Testen der neuen scrape-Funktion ####
+testit <- scraper2(.data = subset_list, .names = name_list[120:742], file = "./Data/scrape2_test.rds")
