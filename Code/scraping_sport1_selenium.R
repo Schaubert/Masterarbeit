@@ -171,8 +171,10 @@ scraped_data2 <- scraper(urls = gesamtliste[91:150, url], saisons = gesamtliste[
 
 scraper2 <- function(.data = dt(), .names = "none", file = "./Data/daten.rds"){
   
-  dt <- readRDS("./Data/scrape2_test.rds") %>% 
+  dt <- readRDS("./Data/scrape2_test.rds") %>%
     setDT
+  
+  # dt <- data.table()
   
   for(i in seq_along(.names)){
     
@@ -213,13 +215,18 @@ scraper2 <- function(.data = dt(), .names = "none", file = "./Data/daten.rds"){
         option <- remDr$findElement(using = "css selector", paste0(".s1-person-performance-data .s1-popup-button-menu li:nth-child(", 
                                                                    2018-saisons[j] + 1, 
                                                                    ") a"))
-        option$clickElement()
-        
-        Sys.sleep(3)
-        
-        ## Scrape data from box
-        option <- remDr$findElement(using = "css selector", ".s1-person-performance-data")
-        ldv[j] <- option$getElementText() %>% unlist
+        if(option$getElementText() == paste0(saisons[j], " / ", saisons[j]+1)){
+          option$clickElement()
+          
+          Sys.sleep(3)
+          
+          ## Scrape data from box
+          option <- remDr$findElement(using = "css selector", ".s1-person-performance-data")
+          ldv[j] <- option$getElementText() %>% unlist
+          
+        }else{
+          ldv[j] <- "falsche Saison"
+        }
         
         Sys.sleep(1)
       }
@@ -246,4 +253,39 @@ scraper2 <- function(.data = dt(), .names = "none", file = "./Data/daten.rds"){
 }
 
 #### >> Testen der neuen scrape-Funktion ####
-testit <- scraper2(.data = subset_list, .names = name_list[120:742], file = "./Data/scrape2_test.rds")
+try(testit <- scraper2(.data = subset_list, .names = name_list[179:742], file = "./Data/scrape2_test.rds"))
+
+Sys.sleep(1800)
+
+file_length <- nrow(readRDS("./Data/scrape2_test.rds"))
+try(testit <- scraper2(.data = subset_list, .names = name_list[(file_length+1):742], file = "./Data/scrape2_test.rds"))
+
+Sys.sleep(1800)
+
+file_length <- nrow(readRDS("./Data/scrape2_test.rds"))
+try(testit <- scraper2(.data = subset_list, .names = name_list[(file_length+1):742], file = "./Data/scrape2_test.rds"))
+
+Sys.sleep(1800)
+
+file_length <- nrow(readRDS("./Data/scrape2_test.rds"))
+try(testit <- scraper2(.data = subset_list, .names = name_list[(file_length+1):742], file = "./Data/scrape2_test.rds"))
+
+Sys.sleep(1800)
+
+file_length <- nrow(readRDS("./Data/scrape2_test.rds"))
+try(testit <- scraper2(.data = subset_list, .names = name_list[(file_length+1):742], file = "./Data/scrape2_test.rds"))
+
+Sys.sleep(1800)
+
+file_length <- nrow(readRDS("./Data/scrape2_test.rds"))
+try(testit <- scraper2(.data = subset_list, .names = name_list[(file_length+1):742], file = "./Data/scrape2_test.rds"))
+
+Sys.sleep(1800)
+
+file_length <- nrow(readRDS("./Data/scrape2_test.rds"))
+try(testit <- scraper2(.data = subset_list, .names = name_list[(file_length+1):742], file = "./Data/scrape2_test.rds"))
+
+Sys.sleep(1800)
+
+file_length <- nrow(readRDS("./Data/scrape2_test.rds"))
+try(testit <- scraper2(.data = subset_list, .names = name_list[(file_length+1):742], file = "./Data/scrape2_test.rds"))
