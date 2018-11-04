@@ -218,7 +218,7 @@ scraper2 <- function(.data = dt(), .names = "none", file = "./Data/daten.rds"){
         if(option$getElementText() == paste0(saisons[j], " / ", saisons[j]+1)){
           option$clickElement()
           
-          Sys.sleep(3)
+          Sys.sleep(4)
           
           ## Scrape data from box
           option <- remDr$findElement(using = "css selector", ".s1-person-performance-data")
@@ -253,39 +253,716 @@ scraper2 <- function(.data = dt(), .names = "none", file = "./Data/daten.rds"){
 }
 
 #### >> Testen der neuen scrape-Funktion ####
-try(testit <- scraper2(.data = subset_list, .names = name_list[179:742], file = "./Data/scrape2_test.rds"))
+try(testit <- scraper2(.data = subset_list, .names = name_list, file = "./Data/scrape2_test.rds"))
 
-Sys.sleep(1800)
+# Sys.sleep(1800)
+# 
+# file_length <- nrow(readRDS("./Data/scrape2_test.rds"))
+# try(testit <- scraper2(.data = subset_list, .names = name_list[(file_length+1):742], file = "./Data/scrape2_test.rds"))
+# 
+# Sys.sleep(1800)
+# 
+# file_length <- nrow(readRDS("./Data/scrape2_test.rds"))
+# try(testit <- scraper2(.data = subset_list, .names = name_list[(file_length+1):742], file = "./Data/scrape2_test.rds"))
+# 
+# Sys.sleep(1800)
+# 
+# file_length <- nrow(readRDS("./Data/scrape2_test.rds"))
+# try(testit <- scraper2(.data = subset_list, .names = name_list[(file_length+1):742], file = "./Data/scrape2_test.rds"))
+# 
+# Sys.sleep(1800)
+# 
+# file_length <- nrow(readRDS("./Data/scrape2_test.rds"))
+# try(testit <- scraper2(.data = subset_list, .names = name_list[(file_length+1):742], file = "./Data/scrape2_test.rds"))
+# 
+# Sys.sleep(1800)
+# 
+# file_length <- nrow(readRDS("./Data/scrape2_test.rds"))
+# try(testit <- scraper2(.data = subset_list, .names = name_list[(file_length+1):742], file = "./Data/scrape2_test.rds"))
+# 
+# Sys.sleep(1800)
+# 
+# file_length <- nrow(readRDS("./Data/scrape2_test.rds"))
+# try(testit <- scraper2(.data = subset_list, .names = name_list[(file_length+1):742], file = "./Data/scrape2_test.rds"))
+# 
+# Sys.sleep(1800)
+# 
+# file_length <- nrow(readRDS("./Data/scrape2_test.rds"))
+# try(testit <- scraper2(.data = subset_list, .names = name_list[(file_length+1):742], file = "./Data/scrape2_test.rds"))
 
-file_length <- nrow(readRDS("./Data/scrape2_test.rds"))
-try(testit <- scraper2(.data = subset_list, .names = name_list[(file_length+1):742], file = "./Data/scrape2_test.rds"))
+#### > Datenbereinigung ####
 
-Sys.sleep(1800)
+dataset <- readRDS("./Data/scrape2_test.rds")
 
-file_length <- nrow(readRDS("./Data/scrape2_test.rds"))
-try(testit <- scraper2(.data = subset_list, .names = name_list[(file_length+1):742], file = "./Data/scrape2_test.rds"))
+## Checke, wie viele Spieler gescrapet werden konnten
+nrow(dataset[!is.na(steckbrief)]) 
+# 450 von 742 - 60.6%
 
-Sys.sleep(1800)
+## Checke ob Längen der Leistungsdaten und der Saisons übereinstimmen
+dataset[, length(saisons %>% unlist)] == dataset[, length(performance_data %>% unlist)]
+# TRUE
 
-file_length <- nrow(readRDS("./Data/scrape2_test.rds"))
-try(testit <- scraper2(.data = subset_list, .names = name_list[(file_length+1):742], file = "./Data/scrape2_test.rds"))
+## Checke Anzahl an gescrapeter Saisons
+dataset[!is.na(steckbrief), length(saisons %>% unlist)] 
+# 2682
+dataset <- dataset[!is.na(steckbrief)] 
 
-Sys.sleep(1800)
+## Erstelle Vektor mit Anzahl der Saisons
+dataset[, lengths := performance_data %>% unlist %>% length, by = .(name)]
 
-file_length <- nrow(readRDS("./Data/scrape2_test.rds"))
-try(testit <- scraper2(.data = subset_list, .names = name_list[(file_length+1):742], file = "./Data/scrape2_test.rds"))
+steck <- vector(mode = "character", length = sum(dataset[, lengths]))
+names <- vector(mode = "character", length = sum(dataset[, lengths]))
 
-Sys.sleep(1800)
+count <- 1
+for(i in 1:nrow(dataset)){
+  
+  steck[count:(count+dataset[i, lengths]-1)] <- dataset[i, steckbrief]
+  names[count:(count+dataset[i, lengths]-1)] <- dataset[i, name]
+  count <- count+dataset[i, lengths]
+  
+}
 
-file_length <- nrow(readRDS("./Data/scrape2_test.rds"))
-try(testit <- scraper2(.data = subset_list, .names = name_list[(file_length+1):742], file = "./Data/scrape2_test.rds"))
+  
+data <- data.table(Names = names,
+                   Steckbrief = steck, 
+                   Leistungsdaten = dataset[, performance_data %>% unlist], 
+                   Saisons = dataset[, saisons %>% unlist]) %>% 
+  setDT %>% 
+  .[, Leistungsdaten := str_replace_all(Leistungsdaten, 
+                                        "LEISTUNGSDATEN\n", 
+                                        "") %>% 
+      str_split(., "\n")] %>% 
+  # Zähle Leistungsdaten, falls 1, dann hat Scrape nicht funktioniert
+  .[, Anzahl_Leistungsdaten := vapply(X = Leistungsdaten, 
+                                      FUN = function(X){
+                                        X %>% unlist %>% length %>% as.character
+                                        }, 
+                                      FUN.VALUE = "character")] %>% 
+  # Checke die Liga, der Leistungsdaten ab
+  .[, Liga := vapply(X = Leistungsdaten,
+                     FUN = function(X){
+                       X %>% 
+                         unlist %>% 
+                         {.[2]} %>% 
+                         str_split(., " ") %>% 
+                         unlist %>% 
+                         .[1]
+                       
+                     },
+                     "character")]
 
-Sys.sleep(1800)
+## Check, wie viele Daten aus der Bundesliga stammen
+nrow(data[Liga == "Bundesliga"])
+# 1767
 
-file_length <- nrow(readRDS("./Data/scrape2_test.rds"))
-try(testit <- scraper2(.data = subset_list, .names = name_list[(file_length+1):742], file = "./Data/scrape2_test.rds"))
+data %>% 
+  .[, Spielminuten := vapply(X = Leistungsdaten,
+                             FUN = function(X){
+                               X %>% 
+                                 unlist %>% 
+                                 .[3] %>% 
+                                 str_replace(., 
+                                             "Gespielte Minuten ", 
+                                             "")
+                             },
+                             FUN.VALUE = "character") %>% as.numeric]
 
-Sys.sleep(1800)
+## Datenprobleme - falls Spieler nicht gespielt hat, oft die Daten von der vorherigen Saison übernommen
+# data[Names == " Naldo" & Saisons == 2010, Problem := "Hat in dieser Saison nicht gespielt"]
+# data[Names == " Bamba Anderson" & Saisons == 2015, Problem := "Hat in dieser Saison nicht gespielt"]
+# data[Names == " Raffael" & Saisons == 2012, Problem := "Falsche Daten"]
+# data[Names == "Aleksandar Ignjovski" & Saisons == 2012, Problem := "Hat in dieser Saison nicht gespielt"]
 
-file_length <- nrow(readRDS("./Data/scrape2_test.rds"))
-try(testit <- scraper2(.data = subset_list, .names = name_list[(file_length+1):742], file = "./Data/scrape2_test.rds"))
+data %>% 
+  .[, Spielminuten_lagg := c(0, Spielminuten)] %>% 
+  .[Spielminuten == Spielminuten_lagg, Problem := "Datenduplikat"]
+
+## Wie viele Daten bleiben übrig?
+nrow(data[Liga == "Bundesliga" & is.na(Problem)])
+# 1661
+
+
+#### > Filtere Daten ####
+## Der Filter ist vorerst, da manche Daten noch nachgescrapet werden müssen
+data <- data[Liga == "Bundesliga" & is.na(Problem)]
+# saveRDS(data, "./Data/filtered_data.rds")
+data <- readRDS("./Data/filtered_data.rds") %>% 
+  setDT
+
+## Ermittle Datentypen (Tore, Pässe, etc.)
+data %>% 
+  .[, Datentypen := vapply(X = Leistungsdaten,
+                           FUN = function(X){
+                             le <- 
+                               X %>% 
+                               unlist %>% 
+                               length
+                             
+                             char <- X %>% 
+                               unlist
+                             
+                             vec <- vector(length = le - 2, mode = "character")
+                             for(i in 3:le){
+                               vec[i-2] <- char[i] %>% 
+                                 str_split(., " ") %>% 
+                                 unlist %>% 
+                                 .[1:(length(.)-1)] %>% 
+                                 paste(collapse = " ")
+                             }
+                             list(vec)
+                           },
+                           FUN.VALUE = list("list"))]
+
+## Ermittle Datentypen
+datentypen <- data[, Datentypen] %>% 
+  unlist %>% 
+  unique #%>% 
+  # str_replace(., " ", "_") %>% 
+  # unlist
+
+
+#### Erstelle Variablen für neue Daten ####
+## Eigentore
+eigen <- vapply(data[, Datentypen], 
+                function(X){
+                  X %>% 
+                    unlist %>% 
+                    {"Eigentore" %in% .}
+                },
+                TRUE)
+
+## Assists
+assist <- vapply(data[, Datentypen], 
+                function(X){
+                  X %>% 
+                    unlist %>% 
+                    {"Assists" %in% .}
+                },
+                TRUE)
+
+## Torschüsse
+schuss <- vapply(data[, Datentypen], 
+                function(X){
+                  X %>% 
+                    unlist %>% 
+                    {"Torschüsse" %in% .}
+                },
+                TRUE)
+
+## Torschussvorlagen
+vorl <- vapply(data[, Datentypen], 
+                function(X){
+                  X %>% 
+                    unlist %>% 
+                    {"Torschussvorlagen" %in% .}
+                },
+                TRUE)
+
+## Ballkontakte
+kont <- vapply(data[, Datentypen], 
+               function(X){
+                 X %>% 
+                   unlist %>% 
+                   {"Ballkontakte" %in% .}
+               },
+               TRUE)
+
+## Gespielte Pässe
+pass <- vapply(data[, Datentypen], 
+                function(X){
+                  X %>% 
+                    unlist %>% 
+                    {"Gespielte Pässe" %in% .}
+                },
+                TRUE)
+
+## Angekommene Pässe
+angpass <- vapply(data[, Datentypen], 
+                function(X){
+                  X %>% 
+                    unlist %>% 
+                    {"Angekommene Pässe" %in% .}
+                },
+                TRUE)
+
+## Fehlpässe
+fehl <- vapply(data[, Datentypen], 
+                function(X){
+                  X %>% 
+                    unlist %>% 
+                    {"Fehlpässe" %in% .}
+                },
+                TRUE)
+
+## Angekommene Pässe %
+passpro <- vapply(data[, Datentypen], 
+                function(X){
+                  X %>% 
+                    unlist %>% 
+                    {"Angekommene Pässe (%)" %in% .}
+                },
+                TRUE)
+
+## Zweikämpfe
+zweik <- vapply(data[, Datentypen], 
+                function(X){
+                  X %>% 
+                    unlist %>% 
+                    {"Zweikämpfe" %in% .}
+                },
+                TRUE)
+
+## Gewonnene Zweikämpfe %
+zweikpro <- vapply(data[, Datentypen], 
+                function(X){
+                  X %>% 
+                    unlist %>% 
+                    {"Gewonnene Zweikämpfe (%)" %in% .}
+                },
+                TRUE)
+
+## Fouls
+fouls <- vapply(data[, Datentypen], 
+                function(X){
+                  X %>% 
+                    unlist %>% 
+                    {"Fouls" %in% .}
+                },
+                TRUE)
+
+## Gefoult worden
+fouled <- vapply(data[, Datentypen], 
+                function(X){
+                  X %>% 
+                    unlist %>% 
+                    {"Gefoult worden" %in% .}
+                },
+                TRUE)
+
+## Abseits
+abseits <- vapply(data[, Datentypen], 
+                function(X){
+                  X %>% 
+                    unlist %>% 
+                    {"Abseits" %in% .}
+                },
+                TRUE)
+
+## Laufweite
+lauf <- vapply(data[, Datentypen], 
+                function(X){
+                  X %>% 
+                    unlist %>% 
+                    {"Laufweite (km)" %in% .}
+                },
+                TRUE)
+
+## Sprints
+sprint <- vapply(data[, Datentypen], 
+                function(X){
+                  X %>% 
+                    unlist %>% 
+                    {"Sprints" %in% .}
+                },
+                TRUE)
+
+## Speed
+speed <- vapply(data[, Datentypen], 
+                function(X){
+                  X %>% 
+                    unlist %>% 
+                    {"Maximale Geschwindigkeit (km/h)" %in% .}
+                },
+                TRUE)
+
+## Tore
+tore <- vapply(data[, Datentypen], 
+                function(X){
+                  X %>% 
+                    unlist %>% 
+                    {"Tore" %in% .}
+                },
+                TRUE)
+
+## Tore per Fuß
+fuss <- vapply(data[, Datentypen], 
+                function(X){
+                  X %>% 
+                    unlist %>% 
+                    {"Tore per Fuß" %in% .}
+                },
+                TRUE)
+
+## Tore per Kopf
+kopf <- vapply(data[, Datentypen], 
+                function(X){
+                  X %>% 
+                    unlist %>% 
+                    {"Tore per Kopf" %in% .}
+                },
+                TRUE)
+
+## Elfmetertore
+elfer <- vapply(data[, Datentypen], 
+                function(X){
+                  X %>% 
+                    unlist %>% 
+                    {"Elfmetertore" %in% .}
+                },
+                TRUE)
+
+## Elfmeter verschossen
+elfermiss <- vapply(data[, Datentypen], 
+                function(X){
+                  X %>% 
+                    unlist %>% 
+                    {"Elfmeter verschossen" %in% .}
+                },
+                TRUE)
+
+## Gegentore
+gegen <- vapply(data[, Datentypen], 
+                function(X){
+                  X %>% 
+                    unlist %>% 
+                    {"Gegentore" %in% .}
+                },
+                TRUE)
+
+## Gehaltene Schüsse
+gehalten <- vapply(data[, Datentypen], 
+                function(X){
+                  X %>% 
+                    unlist %>% 
+                    {"Gehaltene Schüsse" %in% .}
+                },
+                TRUE)
+
+## Gehaltene Elfmeter
+gehaltenelfer <- vapply(data[, Datentypen], 
+                function(X){
+                  X %>% 
+                    unlist %>% 
+                    {"Gehaltene Elfmeter" %in% .}
+                },
+                TRUE)
+
+data %>%
+  .[eigen, Eigentore := vapply(X = Leistungsdaten,
+                                        FUN = function(X){
+                                          X %>% 
+                                            unlist %>% 
+                                            .[str_detect(., "Eigentore")] %>% 
+                                            str_replace(., 
+                                                        "Eigentore ", 
+                                                        "")
+                                        },
+                                        FUN.VALUE = "character") %>% as.numeric]
+
+data %>%
+  .[assist, Assists := vapply(X = Leistungsdaten,
+                               FUN = function(X){
+                                 X %>% 
+                                   unlist %>% 
+                                   .[str_detect(., "Assists")] %>% 
+                                   str_replace(., 
+                                               "Assists ", 
+                                               "")
+                               },
+                               FUN.VALUE = "character") %>% as.numeric]
+
+data %>%
+  .[schuss, Schuss := vapply(X = Leistungsdaten,
+                               FUN = function(X){
+                                 X %>% 
+                                   unlist %>% 
+                                   .[str_detect(., "Torschüsse")] %>% 
+                                   str_replace(., 
+                                               "Torschüsse ", 
+                                               "")
+                               },
+                               FUN.VALUE = "character") %>% as.numeric]
+
+data %>%
+  .[vorl, Schussvorlagen := vapply(X = Leistungsdaten,
+                               FUN = function(X){
+                                 X %>% 
+                                   unlist %>% 
+                                   .[str_detect(., "Torschussvorlagen")] %>% 
+                                   str_replace(., 
+                                               "Torschussvorlagen ", 
+                                               "")
+                               },
+                               FUN.VALUE = "character") %>% as.numeric]
+
+data %>%
+  .[kont, Ballkontakte := vapply(X = Leistungsdaten,
+                               FUN = function(X){
+                                 X %>% 
+                                   unlist %>% 
+                                   .[str_detect(., "Ballkontakte")] %>% 
+                                   str_replace(., 
+                                               "Ballkontakte ", 
+                                               "")
+                               },
+                               FUN.VALUE = "character") %>% as.numeric]
+
+data %>%
+  .[pass, Pass := vapply(X = Leistungsdaten,
+                               FUN = function(X){
+                                 X %>% 
+                                   unlist %>% 
+                                   .[str_detect(., "Gespielte Pässe")] %>% 
+                                   str_replace(., 
+                                               "Gespielte Pässe ", 
+                                               "")
+                               },
+                               FUN.VALUE = "character") %>% as.numeric]
+
+data %>%
+  .[angpass, Pass_angekommen := vapply(X = Leistungsdaten,
+                               FUN = function(X){
+                                 te <- X %>% 
+                                   unlist %>% 
+                                   str_replace(., 
+                                               "Angekommene Pässe \\(%\\)", 
+                                               "")
+                                 te %>% 
+                                   unlist %>% 
+                                   .[str_detect(., "Angekommene Pässe")] %>% 
+                                   str_replace(., 
+                                               "Angekommene Pässe ", 
+                                               "")
+                               },
+                               FUN.VALUE = "character") %>% as.numeric]
+
+data %>%
+  .[fehl, Fehlpass := vapply(X = Leistungsdaten,
+                         FUN = function(X){
+                           X %>% 
+                             unlist %>% 
+                             .[str_detect(., "Fehlpässe")] %>% 
+                             str_replace(., 
+                                         "Fehlpässe ", 
+                                         "")
+                         },
+                         FUN.VALUE = "character") %>% as.numeric]
+
+data %>%
+  .[passpro, Passprozente := vapply(X = Leistungsdaten,
+                         FUN = function(X){
+                           X %>% 
+                             unlist %>% 
+                             .[str_detect(., "Angekommene Pässe \\(%\\)")] %>% 
+                             str_replace(., 
+                                         "Angekommene Pässe \\(%\\) ", 
+                                         "")
+                         },
+                         FUN.VALUE = "character") %>% as.numeric]
+
+data %>%
+  .[zweik, Zweikampf := vapply(X = Leistungsdaten,
+                                    FUN = function(X){
+                                      te <- X %>% 
+                                        unlist %>% 
+                                        str_replace(., 
+                                                    "Gewonnene Zweikämpfe", 
+                                                    "")
+                                      te %>% 
+                                        unlist %>% 
+                                        .[str_detect(., "Zweikämpfe")] %>% 
+                                        str_replace(., 
+                                                    "Zweikämpfe ", 
+                                                    "")
+                                    },
+                                    FUN.VALUE = "character") %>% as.numeric]
+
+data %>%
+  .[zweikpro, Zweikampfprozente := vapply(X = Leistungsdaten,
+                                    FUN = function(X){
+                                      X %>% 
+                                        unlist %>% 
+                                        .[str_detect(., "Gewonnene Zweikämpfe \\(%\\)")] %>% 
+                                        str_replace(., 
+                                                    "Gewonnene Zweikämpfe \\(%\\) ", 
+                                                    "")
+                                    },
+                                    FUN.VALUE = "character") %>% as.numeric]
+
+data %>%
+  .[fouls, Fouls := vapply(X = Leistungsdaten,
+                                    FUN = function(X){
+                                      X %>% 
+                                        unlist %>% 
+                                        .[str_detect(., "Fouls")] %>% 
+                                        str_replace(., 
+                                                    "Fouls ", 
+                                                    "")
+                                    },
+                                    FUN.VALUE = "character") %>% as.numeric]
+
+data %>%
+  .[fouled, Gefoult := vapply(X = Leistungsdaten,
+                                    FUN = function(X){
+                                      X %>% 
+                                        unlist %>% 
+                                        .[str_detect(., "Gefoult worden")] %>% 
+                                        str_replace(., 
+                                                    "Gefoult worden ", 
+                                                    "")
+                                    },
+                                    FUN.VALUE = "character") %>% as.numeric]
+
+data %>%
+  .[abseits, Abseits := vapply(X = Leistungsdaten,
+                                    FUN = function(X){
+                                      X %>% 
+                                        unlist %>% 
+                                        .[str_detect(., "Abseits")] %>% 
+                                        str_replace(., 
+                                                    "Abseits ", 
+                                                    "")
+                                    },
+                                    FUN.VALUE = "character") %>% as.numeric]
+
+data %>%
+  .[lauf, Laufweite := vapply(X = Leistungsdaten,
+                                    FUN = function(X){
+                                      X %>% 
+                                        unlist %>% 
+                                        .[str_detect(., "Laufweite \\(km\\)")] %>% 
+                                        str_replace(., 
+                                                    "Laufweite \\(km\\) ", 
+                                                    "")
+                                    },
+                                    FUN.VALUE = "character") %>% as.numeric]
+
+data %>%
+  .[sprint, Sprints := vapply(X = Leistungsdaten,
+                                    FUN = function(X){
+                                      X %>% 
+                                        unlist %>% 
+                                        .[str_detect(., "Sprints")] %>% 
+                                        str_replace(., 
+                                                    "Sprints ", 
+                                                    "")
+                                    },
+                                    FUN.VALUE = "character") %>% as.numeric]
+
+data %>%
+  .[speed, Geschwindigkeit := vapply(X = Leistungsdaten,
+                                    FUN = function(X){
+                                      X %>% 
+                                        unlist %>% 
+                                        .[str_detect(., "Maximale Geschwindigkeit \\(km/h\\)")] %>% 
+                                        str_replace(., 
+                                                    "Maximale Geschwindigkeit \\(km/h\\) ", 
+                                                    "")
+                                    },
+                                    FUN.VALUE = "character") %>% as.numeric]
+
+data %>%
+  .[tore, Tore := vapply(X = Leistungsdaten,
+                               FUN = function(X){
+                                 te <- X %>% 
+                                   unlist %>% 
+                                   str_replace(., 
+                                               "Tore per", 
+                                               "")
+                                 te %>% 
+                                   unlist %>% 
+                                   .[str_detect(., "Tore")] %>% 
+                                   str_replace(., 
+                                               "Tore ", 
+                                               "")
+                               },
+                               FUN.VALUE = "character") %>% as.numeric]
+
+data %>%
+  .[fuss, Fusstore := vapply(X = Leistungsdaten,
+                                     FUN = function(X){
+                                       X %>% 
+                                         unlist %>% 
+                                         .[str_detect(., "Tore per Fuß")] %>% 
+                                         str_replace(., 
+                                                     "Tore per Fuß ", 
+                                                     "")
+                                     },
+                                     FUN.VALUE = "character") %>% as.numeric]
+
+data %>%
+  .[kopf, Kopftore := vapply(X = Leistungsdaten,
+                             FUN = function(X){
+                               X %>% 
+                                 unlist %>% 
+                                 .[str_detect(., "Tore per Kopf")] %>% 
+                                 str_replace(., 
+                                             "Tore per Kopf ", 
+                                             "")
+                             },
+                             FUN.VALUE = "character") %>% as.numeric]
+
+data %>%
+  .[elfer, Elfmetertore := vapply(X = Leistungsdaten,
+                             FUN = function(X){
+                               X %>% 
+                                 unlist %>% 
+                                 .[str_detect(., "Elfmetertore")] %>% 
+                                 str_replace(., 
+                                             "Elfmetertore ", 
+                                             "")
+                             },
+                             FUN.VALUE = "character") %>% as.numeric]
+
+data %>%
+  .[elfermiss, Elfmeterverschossen := vapply(X = Leistungsdaten,
+                             FUN = function(X){
+                               X %>% 
+                                 unlist %>% 
+                                 .[str_detect(., "Elfmeter verschossen")] %>% 
+                                 str_replace(., 
+                                             "Elfmeter verschossen ", 
+                                             "")
+                             },
+                             FUN.VALUE = "character") %>% as.numeric]
+
+data %>%
+  .[gegen, Gegentore := vapply(X = Leistungsdaten,
+                             FUN = function(X){
+                               X %>% 
+                                 unlist %>% 
+                                 .[str_detect(., "Gegentore")] %>% 
+                                 str_replace(., 
+                                             "Gegentore ", 
+                                             "")
+                             },
+                             FUN.VALUE = "character") %>% as.numeric]
+
+data %>%
+  .[gehalten, Gehalten := vapply(X = Leistungsdaten,
+                             FUN = function(X){
+                               X %>% 
+                                 unlist %>% 
+                                 .[str_detect(., "Gehaltene Schüsse")] %>% 
+                                 str_replace(., 
+                                             "Gehaltene Schüsse ", 
+                                             "")
+                             },
+                             FUN.VALUE = "character") %>% as.numeric]
+
+data %>%
+  .[gehaltenelfer, Gehaltenelfer := vapply(X = Leistungsdaten,
+                             FUN = function(X){
+                               X %>% 
+                                 unlist %>% 
+                                 .[str_detect(., "Gehaltene Elfmeter")] %>% 
+                                 str_replace(., 
+                                             "Gehaltene Elfmeter ", 
+                                             "")
+                             },
+                             FUN.VALUE = "character") %>% as.numeric]
+
+
+
+# saveRDS(data, "./Data/data_cleaned.rds")
+
