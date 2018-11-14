@@ -377,6 +377,8 @@ data %>%
   .[, Spielminuten_lagg := c(0, Spielminuten)] %>% 
   .[Spielminuten == Spielminuten_lagg, Problem := "Datenduplikat"]
 
+saveRDS(data, file = "./Data/scraped_data_with_missings.rds")
+
 ## Wie viele Daten bleiben übrig?
 nrow(data[Liga == "Bundesliga" & is.na(Problem)])
 # 1661
