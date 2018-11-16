@@ -263,8 +263,6 @@ dataset[, length(saisons %>% unlist)] == dataset[, length(performance_data %>% u
 dataset[, length(saisons %>% unlist)] 
 # 1118
 
-dataset[!"falsche Saison" %in% performance_data]
-
 ## Erstelle Vektor mit Anzahl der Saisons
 dataset[, lengths := performance_data %>% unlist %>% length, by = .(name)]
 ## Aktuell noch doppelte wegen nachscrapen der falschen Saisons, dort wird Länge 
@@ -341,9 +339,10 @@ data %>%
 # data[Names == " Raffael" & Saisons == 2012, Problem := "Falsche Daten"]
 # data[Names == "Aleksandar Ignjovski" & Saisons == 2012, Problem := "Hat in dieser Saison nicht gespielt"]
 
-data %>% 
-  .[, Spielminuten_lagg := c(0, Spielminuten)] %>% 
-  .[Spielminuten == Spielminuten_lagg, Problem := "Datenduplikat"]
+## noch nicht rausfiltern wegen Saisons dazwischen
+# data %>% 
+#   .[, Spielminuten_lagg := c(0, Spielminuten)] %>% 
+#   .[Spielminuten == Spielminuten_lagg, Problem := "Datenduplikat"]
 
 data[Leistungsdaten == "falsche Saison", Problem := "falsche Saison"]
 
