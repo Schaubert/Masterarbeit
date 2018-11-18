@@ -5,12 +5,17 @@ source("./Code/global.r")
 
 #### Datensätze einlesen ####
 
-data_first <- readRDS("./Data/data_cleaned.rds")
+data_first <- readRDS("./Data/data_cleaned.rds") %>% 
+  .[, Spielminuten_lagg := NULL]
 data_second <- readRDS("./Data/nach_gescraped_data_cleaned.rds")
 
 #### > Merge ####
 
 data <- rbind(data_first, data_second, use.names = TRUE)
+
+#### >> Doppelten Julian Baumgartlinger raus ####
+to_deleted_row <- which(data[, Names] == "Julian Baumgartlinger")[1]
+data <- data[c(1:(to_deleted_row-1), (to_deleted_row+1):nrow(data))]
 
 #### Daten auffüllen ####
 

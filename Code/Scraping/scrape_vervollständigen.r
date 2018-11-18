@@ -247,6 +247,53 @@ Sys.sleep(1800)
 file_length <- nrow(readRDS("./Data/nach_scrapen.rds"))
 try(testit <- nach_scraper(.data = data_all, .names = name_list[(file_length+1):411], file = "./Data/nach_scrapen.rds"))
 
+##### >> nach scrapen Julian Baumgartlinger ####
+# dt <- readRDS("./Data/nach_scrapen.rds") %>%
+#   setDT
+# 
+# # Saisons
+# n <- 1
+# 
+# ## open Server
+# rD <- rsDriver(port = floor(runif(1,1,9999)) %>% as.integer, browser = "firefox")
+# 
+# remDr <- rD[["client"]]
+# remDr$navigate("https://www.sport1.de/fussball/person/julian-baumgartlinger")
+# 
+# ## Get Steckbrief
+# option <- remDr$findElement(using = 'css selector', ".s1-column-double")
+# steckbrief <- option$getElementText() %>% unlist
+# 
+# ## Initialisiere Leistungsdatenvektor
+# ldv <- vector(length = n, mode = "character")
+# 
+# ## Get Saisons
+# option <- remDr$findElement(using = "css selector", ".s1-person-performance-data .s1-popup-button-title")
+# option$clickElement()
+# 
+# ## Wähle 2011/2012
+# option <- remDr$findElement(using = "css selector", paste0(".s1-person-performance-data .s1-popup-button-menu li:nth-child(", 
+#                                                            8, 
+#                                                            ") a"))
+# option$clickElement()
+# 
+# ## Wähle Bundesliga
+# comp.option <- remDr$findElement(using = "css selector", ".active+ .s1-person-performance-competition")
+# comp.option$clickElement()
+# 
+# ## Scrape data
+# option <- remDr$findElement(using = "css selector", ".s1-person-performance-data")
+# ldv[1] <- option$getElementText() %>% unlist
+# 
+# dt <- rbind(dt,
+#             data.table(name = "Julian Baumgartlinger",
+#                        steckbrief = steckbrief,
+#                        performance_data = list(ldv), 
+#                        saisons = list(2011)))
+# 
+# remDr$close()
+# rm("option", "rD", "remDr", "steckbrief", "ldv")
+# saveRDS(dt, file = "./Data/nach_scrapen.rds")
 
 
 ##### > Datenbereinigung ####
@@ -261,7 +308,7 @@ dataset[, length(saisons %>% unlist)] == dataset[, length(performance_data %>% u
 
 ## Checke Anzahl an nachgescrapeter Saisons
 dataset[, length(saisons %>% unlist)] 
-# 1118
+# 1119
 
 ## Erstelle Vektor mit Anzahl der Saisons
 dataset[, lengths := performance_data %>% unlist %>% length, by = .(name)]
@@ -269,6 +316,7 @@ dataset[, lengths := performance_data %>% unlist %>% length, by = .(name)]
 ## falsch kalkuliert, muss also noch halbiert werden
 names_double <- dataset[1:18, name]
 dataset[name %in% names_double, lengths := lengths/2]
+dataset[name == "Julian Baumgartlinger", lengths := c(3,1)]
 
 steck <- vector(mode = "character", length = sum(dataset[, lengths]))
 names <- vector(mode = "character", length = sum(dataset[, lengths]))
@@ -319,7 +367,7 @@ data <- data.table(Names = names,
 
 ## Check, wie viele Daten aus der Bundesliga stammen
 nrow(data[Liga == "Bundesliga"])
-# 991
+# 992
 
 data %>% 
   .[, Spielminuten := vapply(X = Leistungsdaten,
@@ -349,9 +397,8 @@ data[Leistungsdaten == "falsche Saison", Problem := "falsche Saison"]
 saveRDS(data, file = "./Data/nach_gescraped_data.rds")
 
 ## Wie viele Daten bleiben übrig?
-nrow(data[Liga == "Bundesliga" & is.na(Problem) |
-            Leistungsdaten == "keine Bundesligadaten für diese Saison verfügbar"])
-# 969
+nrow(data[Liga == "Bundesliga" & is.na(Problem)])
+# 992
 
 #### > Filtere Daten ####
 
