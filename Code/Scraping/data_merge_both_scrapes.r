@@ -51,3 +51,4 @@ data %>%
   .[Leistungsdaten == "keine Bundesligadaten für diese Saison verfügbar", Gehaltenelfer := 0]
 
 # saveRDS(data, "./Data/data.rds")
+## An Steckbrief_zerlegen denken!

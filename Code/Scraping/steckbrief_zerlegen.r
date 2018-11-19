@@ -4,7 +4,7 @@
 source("./Code/global.r")
 
 #### Daten einlesen ####
-data <- readRDS("./Data/merged_data.rds")
+data <- readRDS("./Data/data.rds")
 
 #### Steckbrief zerlegen ####
 
