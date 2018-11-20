@@ -158,33 +158,33 @@ position_scrape <- function(.data = dt()){
 
 #### Testen der Funktion ####
 
-rows <- nrow(readRDS( file = "./Data/position_list.rds"))
-try(test <- position_scrape(.data = position_list[rows+1:nrow(position_list)]))
-
-Sys.sleep(100)
-
-# position_list[Name == "Klaas Jan Huntelaar", Name := "Klaas-Jan Huntelaar"]
-position_list[Name == "Per Skjelbred",  Name := "Per Ciljan Skjelbred"]
-rows <- nrow(readRDS( file = "./Data/position_list.rds"))
-try(test <- position_scrape(.data = position_list[rows+1:nrow(position_list)]))
-
-Sys.sleep(1000)
-
-rows <- nrow(readRDS( file = "./Data/position_list.rds"))
-try(test <- position_scrape(.data = position_list[rows+1:nrow(position_list)]))
-
-Sys.sleep(1000)
-
-rows <- nrow(readRDS( file = "./Data/position_list.rds"))
-try(test <- position_scrape(.data = position_list[rows+1:nrow(position_list)]))
-
-Sys.sleep(1000)
-
-rows <- nrow(readRDS( file = "./Data/position_list.rds"))
-try(test <- position_scrape(.data = position_list[rows+1:nrow(position_list)]))
+# rows <- nrow(readRDS( file = "./Data/position_list.rds"))
+# try(test <- position_scrape(.data = position_list[rows+1:nrow(position_list)]))
+# 
+# Sys.sleep(100)
+# 
+# # position_list[Name == "Klaas Jan Huntelaar", Name := "Klaas-Jan Huntelaar"]
+# position_list[Name == "Per Skjelbred",  Name := "Per Ciljan Skjelbred"]
+# rows <- nrow(readRDS( file = "./Data/position_list.rds"))
+# try(test <- position_scrape(.data = position_list[rows+1:nrow(position_list)]))
+# 
+# Sys.sleep(1000)
+# 
+# rows <- nrow(readRDS( file = "./Data/position_list.rds"))
+# try(test <- position_scrape(.data = position_list[rows+1:nrow(position_list)]))
+# 
+# Sys.sleep(1000)
+# 
+# rows <- nrow(readRDS( file = "./Data/position_list.rds"))
+# try(test <- position_scrape(.data = position_list[rows+1:nrow(position_list)]))
+# 
+# Sys.sleep(1000)
+# 
+# rows <- nrow(readRDS( file = "./Data/position_list.rds"))
+# try(test <- position_scrape(.data = position_list[rows+1:nrow(position_list)]))
 
 ## Wie viele Namen wurden nicht gefunden?
-sum(test$Position == "wurde nicht gefunden")
+# sum(test$Position == "wurde nicht gefunden")
 # 48
 # kann man per Hand eingeben!
 
@@ -266,22 +266,136 @@ not_found <- data_firstscrape[!str_detect(Position, "Spiele als ...")] %>%
                "https://www.transfermarkt.de/yunus-malli/profil/spieler/85352",
                "https://www.transfermarkt.de/zlatko-junuzovic/profil/spieler/31007")]
 
-# not_found <- data_firstscrape[Position == "wurde nicht gefunden"]
-# data_found <- data_firstscrape[!Position == "wurde nicht gefunden"] %>% 
-#   .[, length := Saison %>% unlist %>% length, by = Name]
-# 
-# names <- vector(mode = "character", length = sum(data_found[, length]))
-# 
-# count <- 1
-# for(i in 1:nrow(data_found)){
-#   
-#   names[count:(count+data_found[i, length]-1)] <- data_found[i, Name]
-#   count <- count+data_found[i, length]
-#   
-# }
-# 
-# 
-# data_found_split <- data.table(Name = names, 
-#                    Position = data_found[, Position %>% unlist], 
-#                    Saison = data_found[, Saison %>% unlist])
+## Überprüfen, ob alle Zeilen getroffen wurden
+sum(not_found[is.na(url), Position] == "wurde nicht gefunden")
+# 0 passt
 
+sum(not_found[!is.na(url), Position] != "wurde nicht gefunden")
+# 0 passt
+
+#### Positionsscrapefunktion anpassen ####
+position_scrape2 <- function(.data = dt()){
+  
+  dt <- readRDS( file = "./Data/position_list2.rds") %>%
+    setDT
+  
+  # dt <- data.table()
+  
+  for(i in 1:nrow(.data)){
+    
+    rD <- rsDriver(port = floor(runif(1,1,9999)) %>% as.integer, browser = "firefox")
+    
+    remDr <- rD[["client"]]
+    
+    if(is.na(.data[i, url])){
+      remDr$navigate("https://www.transfermarkt.de")
+      
+      ## Wähle Box aus
+      option <- remDr$findElement(using = "css selector", "#schnellsuche input")
+      option$clickElement()
+      
+      ## Gib Spielernamen ein und drücke Enter
+      option$sendKeysToElement(list(.data[i, Name], "\uE007"))
+      
+      Sys.sleep(6)
+      
+      ## Wähle Spieler in Spielerliste aus
+      option <- remDr$findElement(using = "css selector", ".tooltipstered")
+      scraped_name <- option$getElementText() %>% unlist
+      
+      .saisons <- unlist(.data[i, Saison])
+      n <- length(.saisons)
+      
+      if(scraped_name == .data[i, Name]){
+        option$clickElement()
+        
+        Sys.sleep(6)
+        
+        ## Gehe zu kompletten Leistungsdaten
+        option <- remDr$findElement(using = "css selector", ".table-footer a")
+        option$clickElement()
+        
+        Sys.sleep(10)
+        
+        ## Nehme aktuelle URL und navigiere zu Saison
+        curr_URL <- remDr$getCurrentUrl() %>% unlist
+        
+        positionen <- vector(length = n, mode = "character")
+        
+        ## Für jede Saison einmal Daten abrufen
+        for(j in 1:n){
+          
+          remDr$navigate(paste0(curr_URL, "/plus/0?saison=", .saisons[j]))
+          
+          Sys.sleep(2)
+          
+          ## Scrape Text
+          option <- remDr$findElement(using = "css selector", ".large-4 table")
+          positionen[j] <- option$getElementText() %>% unlist
+          
+        }
+        
+        dt <- rbind(dt,
+                    data.table(Name = .data[i, Name],
+                               Position = list(positionen),
+                               Saison = list(.saisons)))
+        
+      }else{
+        dt <- rbind(dt, 
+                    data.table(Name = .data[i, Name],
+                               Position = "wurde nicht gefunden",
+                               Saison = list(.saisons)))
+      }
+    }else{
+      remDr$navigate(.data[i, url])
+      
+      ## Gehe zu kompletten Leistungsdaten
+      option <- remDr$findElement(using = "css selector", ".table-footer a")
+      option$clickElement()
+      
+      Sys.sleep(10)
+      
+      ## Nehme aktuelle URL und navigiere zu Saison
+      curr_URL <- remDr$getCurrentUrl() %>% unlist
+      
+      .saisons <- unlist(.data[i, Saison])
+      n <- length(.saisons)
+      positionen <- vector(length = n, mode = "character")
+      
+      ## Für jede Saison einmal Daten abrufen
+      for(j in 1:n){
+        
+        remDr$navigate(paste0(curr_URL, "/plus/0?saison=", .saisons[j]))
+        
+        Sys.sleep(2)
+        
+        ## Scrape Text
+        option <- remDr$findElement(using = "css selector", ".large-4 table")
+        positionen[j] <- option$getElementText() %>% unlist
+        
+      }
+      
+      dt <- rbind(dt,
+                  data.table(Name = .data[i, Name],
+                             Position = list(positionen),
+                             Saison = list(.saisons)))
+      
+    }
+    
+    remDr$close()
+    rm("option", "rD", "remDr", ".saisons", "n")
+    
+    saveRDS(dt, file = "./Data/position_list2.rds")
+    
+  }
+  
+  dt
+  
+}
+
+
+#### Testen der Nachscrape-Funktion ####
+test <- position_scrape2(.data = not_found)
+
+rows <- nrow(readRDS("./Data/position_list2.rds"))
+test <- position_scrape2(.data = not_found[rows+1:nrow(not_found)])
