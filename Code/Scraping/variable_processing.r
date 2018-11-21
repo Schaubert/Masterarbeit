@@ -40,6 +40,9 @@ data %>%
   .[Zweitposition %in% c("Linksaußen", "Rechtsaußen"),
     Zweitposition_adj := "Flügelstürmer"]
 
+# Libero als Defensives Mittelfeld oder Innenverteidiger?
+# Eventuell durch Clustern bestimmen!
+
 rpart(Hauptposition_adj ~ Eigentore + Assists + Schuss + Schussvorlagen + 
         Ballkontakte + Pass +Passprozente + Zweikampf + Zweikampfprozente + 
         Fouls + Gefoult + Abseits + Laufweite + Sprints + Geschwindigkeit + Tore
@@ -47,3 +50,8 @@ rpart(Hauptposition_adj ~ Eigentore + Assists + Schuss + Schussvorlagen +
   rpart.plot(box.palette = list("green3", "mistyrose2", "red", "gold2", "blue", "yellow", 
                                 "orange", "gray", "pink", "brown"))
 
+
+#### Augefüllte 0en bei Abseits überprüfen ####
+data[Abseits == 0, Hauptposition_adj] %>% table
+
+## [[[[]]]] Hier geht es weiter!
