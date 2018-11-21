@@ -276,10 +276,10 @@ sum(not_found[!is.na(url), Position] != "wurde nicht gefunden")
 #### Positionsscrapefunktion anpassen ####
 position_scrape2 <- function(.data = dt()){
   
-  dt <- readRDS( file = "./Data/position_list2.rds") %>%
-    setDT
+  # dt <- readRDS( file = "./Data/position_list2.rds") %>%
+  #   setDT
   
-  # dt <- data.table()
+  dt <- data.table()
   
   for(i in 1:nrow(.data)){
     
@@ -315,7 +315,7 @@ position_scrape2 <- function(.data = dt()){
         option <- remDr$findElement(using = "css selector", ".table-footer a")
         option$clickElement()
         
-        Sys.sleep(10)
+        Sys.sleep(20)
         
         ## Nehme aktuelle URL und navigiere zu Saison
         curr_URL <- remDr$getCurrentUrl() %>% unlist
@@ -399,3 +399,40 @@ test <- position_scrape2(.data = not_found)
 
 rows <- nrow(readRDS("./Data/position_list2.rds"))
 test <- position_scrape2(.data = not_found[rows+1:nrow(not_found)])
+
+# #### Check der nachgescrapeten Daten ####
+# test <- readRDS("./Data/position_list2.rds")
+# 
+# nrow(test[str_detect(Position, "Spiele als ...")])
+# ## Immernoch nicht alle erwischt; 11 fehlen. nochmal nachscrapen
+# 
+# nachscrape_data <- not_found[Name %in% test[!str_detect(Position, 
+#                                                         "Spiele als ..."), 
+#                                             Name]] %>% 
+#   .[Name == "Tobias Weis", url := "https://www.transfermarkt.de/tobias-weis/profil/spieler/20444"] %>% 
+#   .[Name == "Raphael Schäfer", url := "https://www.transfermarkt.de/raphael-schafer/profil/spieler/1150"]
+# 
+# #### Nachscrapen Teil 2 ####
+#
+# Nur Notwendig, falls nach nachscrapen immernoch Spieler nicht gefunden wurden
+#
+# test2 <- position_scrape2(.data = nachscrape_data)
+# 
+# ## Binde die beiden Scrapes
+# all <- rbind(test[str_detect(Position, 
+#                              "Spiele als ...")],
+#              test2,
+#              use.names = TRUE)
+
+# saveRDS(all, "./Data/position_list2.rds")
+
+#### Merge beide Scrapes ####
+data_firstscrape <- readRDS("./Data/position_list.rds")
+data_secondscrape <- readRDS("./Data/position_list2.rds")
+
+all <- rbind(data_firstscrape[str_detect(Position, "Spiele als ...")] %>% 
+               .[Name != "Rafinha"],
+             data_secondscrape,
+             use.names = TRUE)
+
+# saveRDS(all, "./Data/all_positions_raw.rds")
